@@ -64,9 +64,10 @@ def classify_post():
         languages = get_repo_languages(github_username, repo_name)
         for lang in languages:
             tech_stack_counter[lang] += 1
+    # Just create a list of unique techs
+    tech_skills = list(tech_stack_counter.keys())
 
-    # Convert to dictionary format for MongoDB (e.g., [{"tech": "Python", "count": 5}, ...])
-    tech_skills = [{"tech": tech, "count": count} for tech, count in tech_stack_counter.items()]
+
 
     # Update the user's document in the "users" collection
     posts_collection.update_one(
