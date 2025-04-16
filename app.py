@@ -3,6 +3,8 @@ from pymongo import MongoClient
 import requests
 from bson import ObjectId
 from collections import defaultdict
+from dotenv import load_dotenv
+import os
 
 app = Flask(__name__)
 
@@ -14,7 +16,8 @@ users_collection = db["users"]
 developers_collection = db["developers"]
 
 # GitHub headers
-GITHUB_TOKEN = "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"
+load_dotenv()
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 HEADERS = {"Authorization": f"token {GITHUB_TOKEN}"}
 
 # Get all repos of a user
