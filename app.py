@@ -14,7 +14,7 @@ users_collection = db["users"]
 developers_collection = db["developers"]
 
 # GitHub headers
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 HEADERS = {"Authorization": f"token {GITHUB_TOKEN}"}
 
 # Get all repos of a user
