@@ -94,14 +94,23 @@ def classify_developer():
     print("Match %:", match_percentage)
 
     if match_percentage >= 50:
+    # Update profile.skills to only include matched skills (original casing preserved)
+        matched_skills_original_case = [skill for skill in user_doc.get("profile", {}).get("skills", []) if skill.lower() in github_tech_stack_lower]
+
         users_collection.update_one(
             {"_id": user_object_id},
-            {"$set": {"role": "developer"}}
+            {
+                "$set": {
+                    "role": "developer",
+                    "profile.skills": matched_skills_original_case
+                }
+            }
         )
         developers_collection.update_one(
             {"_id": developer_object_id},
             {"$set": {"status": "approved"}}
         )
+
         return jsonify({
             "message": "User verified successfully.",
             "match_percentage": match_percentage,
