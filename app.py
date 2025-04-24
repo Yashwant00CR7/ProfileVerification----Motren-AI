@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import requests
 from bson import ObjectId
-from collections import defaultdict
 from dotenv import load_dotenv
 import os
 
@@ -20,13 +19,11 @@ load_dotenv()
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 HEADERS = {"Authorization": f"token {GITHUB_TOKEN}"}
 
-# Get all repos of a user
 def get_user_repos(username):
     url = f"https://api.github.com/users/{username}/repos"
     response = requests.get(url, headers=HEADERS)
     return response.json() if response.status_code == 200 else []
 
-# Get languages used in a repo
 def get_repo_languages(username, repo_name):
     url = f"https://api.github.com/repos/{username}/{repo_name}/languages"
     response = requests.get(url, headers=HEADERS)
@@ -34,7 +31,7 @@ def get_repo_languages(username, repo_name):
 
 @app.route('/classify', methods=['GET'])
 def classify_developer():
-    developer_id = request.args.get("developer_id")  # _id from developers collection
+    developer_id = request.args.get("developer_id")
 
     if not developer_id:
         return jsonify({"error": "developer_id is required"}), 400
@@ -44,7 +41,6 @@ def classify_developer():
     except Exception as e:
         return jsonify({"error": f"Invalid ObjectId: {str(e)}"}), 400
 
-    # Get developer document
     developer_doc = developers_collection.find_one({"_id": developer_object_id})
     if not developer_doc:
         return jsonify({"error": "Developer not found"}), 404
@@ -58,12 +54,10 @@ def classify_developer():
     except Exception as e:
         return jsonify({"error": f"Invalid userId format: {str(e)}"}), 400
 
-    # Get user document
     user_doc = users_collection.find_one({"_id": user_object_id})
     if not user_doc:
         return jsonify({"error": "User not found"}), 404
 
-    # Extract GitHub username from URL
     github_url = user_doc.get("profile", {}).get("links", {}).get("github", "")
     if not github_url or "github.com/" not in github_url:
         return jsonify({"error": "GitHub URL is invalid or missing"}), 400
@@ -79,26 +73,25 @@ def classify_developer():
             languages = get_repo_languages(github_username, repo_name)
             github_tech_stack.update(languages)
 
-    # Convert tech to lowercase for case-insensitive match
     github_tech_stack_lower = {lang.lower() for lang in github_tech_stack}
 
-    # Get user's listed skills
-    user_skills = user_doc.get("profile", {}).get("skills", [])
-    user_skills_lower = [skill.lower() for skill in user_skills]
+    # Get skills from both developer and user documents
+    dev_techstack = developer_doc.get("techstack", [])
+    user_profile_skills = user_doc.get("profile", {}).get("skills", [])
 
-    # Compare profile.skills with GitHub tech stack
-    matched_skills = [skill for skill in user_skills_lower if skill in github_tech_stack_lower]
-    match_percentage = (len(matched_skills) / len(user_skills_lower)) * 100 if user_skills_lower else 0
+    combined_skills = list(set(dev_techstack + user_profile_skills))
+    combined_skills_lower = [skill.lower() for skill in combined_skills]
 
-    # Debug logging
-    print("User Skills:", user_skills)
+    matched_skills = [skill for skill in combined_skills_lower if skill in github_tech_stack_lower]
+    match_percentage = (len(matched_skills) / len(combined_skills_lower)) * 100 if combined_skills_lower else 0
+
+    print("Combined Skills:", combined_skills)
     print("GitHub Stack:", list(github_tech_stack))
     print("Matched Skills:", matched_skills)
     print("Match %:", match_percentage)
 
     if match_percentage >= 50:
-    # Update profile.skills to only include matched skills (original casing preserved)
-        matched_skills_original_case = [skill for skill in user_doc.get("profile", {}).get("skills", []) if skill.lower() in github_tech_stack_lower]
+        matched_skills_original_case = [skill for skill in combined_skills if skill.lower() in github_tech_stack_lower]
 
         users_collection.update_one(
             {"_id": user_object_id},
@@ -119,7 +112,7 @@ def classify_developer():
             "match_percentage": match_percentage,
             "status": "approved",
             "github_stack": list(github_tech_stack),
-            "user_skills": user_skills,
+            "user_skills": combined_skills,
             "updated_role": "developer"
         }), 200
     else:
@@ -128,7 +121,7 @@ def classify_developer():
             "match_percentage": match_percentage,
             "status": "pending",
             "github_stack": list(github_tech_stack),
-            "user_skills": user_skills
+            "user_skills": combined_skills
         }), 200
 
 if __name__ == '__main__':
